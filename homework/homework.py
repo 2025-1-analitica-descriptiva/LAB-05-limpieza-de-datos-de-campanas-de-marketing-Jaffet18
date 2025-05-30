@@ -54,8 +54,8 @@ def clean_campaign_data():
     from datetime import datetime
 
     # Definición de rutas donde se almacenarán los resultados
-    input_dir = os.path.join('..', 'files', 'input')
-    output_dir = os.path.join('..', 'files', 'output')
+    input_dir = os.path.join('.', 'files', 'input')
+    output_dir = os.path.join('.', 'files', 'output')
 
     # Crear directorio de salida si no existe
     os.makedirs(output_dir, exist_ok=True)
