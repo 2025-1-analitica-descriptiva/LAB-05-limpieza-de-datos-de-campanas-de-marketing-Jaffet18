@@ -102,7 +102,7 @@ def clean_campaign_data():
                         # Campaing
                         if all(col in df.columns for col in ['month', 'day']):
                             campaign_data = df[['client_id', 'number_contacts', 'contact_duration', 
-                                            'previous_campaign_contacts', 'previous_outcome', 
+                                            'previous_campaing_contacts', 'previous_outcome', 
                                             'campaign_outcome', 'day', 'month']].copy()
                             campaign_data.rename(columns={'previous_campaign_contacts': 'previous_campaing_contacts'}, inplace=True)
                             
