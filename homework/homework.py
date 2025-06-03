@@ -48,106 +48,83 @@ def clean_campaign_data():
 
     """
 
-    import os
-    import zipfile
     import pandas as pd
-    from datetime import datetime
+    import zipfile
+    import os
+    from pathlib import Path
 
-    # Definición de rutas donde se almacenarán los resultados
-    input_dir = os.path.join('.', 'files', 'input')
-    output_dir = os.path.join('.', 'files', 'output')
+    def clean_job(job):
+        """Limpia la columna job reemplazando caracteres no deseados"""
+        if pd.isna(job):
+            return job
+        return job.replace(".", "").replace("-", "_")
 
-    # Crear directorio de salida si no existe
-    os.makedirs(output_dir, exist_ok=True)
+    def clean_education(education):
+        """Limpia la columna education y maneja valores desconocidos"""
+        if pd.isna(education) or education == "unknown":
+            return pd.NA
+        return education.replace(".", "_")
 
-    # Directorio de meses numérico
-    month_map = {
-        'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
-        'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
-    }
-
-    # Creación de DataFrames vacíos con las columnas específicas
-    client_df = pd.DataFrame(columns=['client_id', 'age', 'job', 'marital', 'education', 'credit_default', 'mortage'])
-    campaign_df = pd.DataFrame(columns=['client_id', 'number_contacts', 'contact_duration', 'previous_campaing_contacts', 
-                                    'previous_outcome', 'campaign_outcome', 'last_contact_day'])
-    economics_df = pd.DataFrame(columns=['client_id', 'const_price_idx', 'eurobor_three_months'])
-
-    # Procesamiento de los achivos ZIP
-    for zip_file in os.listdir(input_dir):
-        if zip_file.endswith('.zip'):
-            zip_path = os.path.join(input_dir, zip_file)
-            
-            try:
-                with zipfile.ZipFile(zip_path, 'r') as z:
-                    csv_files = [f for f in z.namelist() if f.endswith('.csv')]
-                    if not csv_files:
-                        continue
+    def transform_data(input_zip_folder, output_folder):
+        # Crear la carpeta de salida si no existe
+        Path(output_folder).mkdir(parents=True, exist_ok=True)
+        
+        # Inicializar DataFrames para cada archivo de salida
+        client_df = pd.DataFrame()
+        campaign_df = pd.DataFrame()
+        economics_df = pd.DataFrame()
+        
+        # Procesar cada archivo ZIP en la carpeta de entrada
+        for zip_file in Path(input_zip_folder).glob("*.zip"):
+            with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+                # Asumimos que cada ZIP contiene exactamente un archivo CSV
+                csv_file = zip_ref.namelist()[0]
+                with zip_ref.open(csv_file) as file:
+                    df = pd.read_csv(file)
                     
-                    with z.open(csv_files[0]) as f:
-                        df = pd.read_csv(f)
-                        
-                        # Clients
-                        client_data = df[['client_id', 'age', 'job', 'marital', 'education', 
-                                        'credit_default', 'mortgage']].copy()
-                        client_data.rename(columns={'mortgage': 'mortage'}, inplace=True)
-                        
-                        # Limpiando datos según especificaciones
-                        client_data['job'] = client_data['job'].str.replace('.', '').str.replace('-', '_')
-                        client_data['education'] = client_data['education'].str.replace('.', '_').replace('unknown', pd.NA)
-                        client_data['credit_default'] = client_data['credit_default'].apply(lambda x: 1 if str(x).lower() == 'yes' else 0)
-                        client_data['mortage'] = client_data['mortage'].apply(lambda x: 1 if str(x).lower() == 'yes' else 0)
-                        
-                        client_df = pd.concat([client_df, client_data], ignore_index=True)
-                        
-                        # Campaing
-                        if all(col in df.columns for col in ['month', 'day']):
-                            campaign_data = df[['client_id', 'number_contacts', 'contact_duration', 
-                                            'previous_campaing_contacts', 'previous_outcome', 
-                                            'campaign_outcome', 'day', 'month']].copy()
-                            campaign_data.rename(columns={'previous_campaign_contacts': 'previous_campaing_contacts'}, inplace=True)
-                            
-                            # Limpinando datos para Campaing según indicaciones
-                            campaign_data['previous_outcome'] = campaign_data['previous_outcome'].apply(
-                                lambda x: 1 if str(x).lower() == 'success' else 0
-                            )
-                            campaign_data['campaign_outcome'] = campaign_data['campaign_outcome'].apply(
-                                lambda x: 1 if str(x).lower() == 'yes' else 0
-                            )
-                            
-                            # Sustitución de fecha a numérica y creación de fecha
-                            campaign_data['month'] = campaign_data['month'].str.lower().str[:3].map(month_map)
-                            campaign_data['last_contact_day'] = campaign_data.apply(
-                                lambda row: f"2022-{int(row['month']):02d}-{int(row['day']):02d}", axis=1
-                            )
-                            
-                            campaign_data = campaign_data.drop(['day', 'month'], axis=1)
-                            campaign_df = pd.concat([campaign_df, campaign_data], ignore_index=True)
-                        
-                        # Economics
-                        economics_data = df[['client_id', 'cons_price_idx', 'euribor_three_months']].copy()
-                        economics_data.rename(columns={
-                            'cons_price_idx': 'const_price_idx',
-                            'euribor_three_months': 'eurobor_three_months'
-                        }, inplace=True)
-                        
-                        economics_df = pd.concat([economics_df, economics_data], ignore_index=True)
-                        
-            except Exception as e:
-                continue
+                    # Procesar datos para client.csv
+                    client_data = df[['client_id', 'age', 'job', 'marital', 'education', 'credit_default', 'mortgage']].copy()
+                    client_data['job'] = client_data['job'].apply(clean_job)
+                    client_data['education'] = client_data['education'].apply(clean_education)
+                    client_data['credit_default'] = client_data['credit_default'].apply(lambda x: 1 if x == 'yes' else 0)
+                    client_data['mortgage'] = client_data['mortgage'].apply(lambda x: 1 if x == 'yes' else 0)
+                    
+                    # Procesar datos para campaign.csv
+                    campaign_data = df[['client_id', 'number_contacts', 'contact_duration', 
+                                    'previous_campaign_contacts', 'previous_outcome', 
+                                    'campaign_outcome', 'day', 'month']].copy()
+                    campaign_data['previous_outcome'] = campaign_data['previous_outcome'].apply(
+                        lambda x: 1 if x == 'success' else 0)
+                    campaign_data['campaign_outcome'] = campaign_data['campaign_outcome'].apply(
+                        lambda x: 1 if x == 'yes' else 0)
+                    campaign_data['last_contact_day'] = pd.to_datetime(
+                        '2022-' + campaign_data['month'].astype(str) + '-' + campaign_data['day'].astype(str),
+                        format='%Y-%b-%d'
+                    ).dt.strftime('%Y-%m-%d')
+                    campaign_data.drop(['day', 'month'], axis=1, inplace=True)
+                    
+                    # Procesar datos para economics.csv
+                    economics_data = df[['client_id', 'cons_price_idx', 'euribor_three_months']].copy()
+                    
+                    # Concatenar con los DataFrames principales
+                    client_df = pd.concat([client_df, client_data], ignore_index=True)
+                    campaign_df = pd.concat([campaign_df, campaign_data], ignore_index=True)
+                    economics_df = pd.concat([economics_df, economics_data], ignore_index=True)
+        
+        # Eliminar duplicados por si hay solapamiento entre archivos ZIP
+        client_df.drop_duplicates(subset=['client_id'], inplace=True)
+        campaign_df.drop_duplicates(subset=['client_id'], inplace=True)
+        economics_df.drop_duplicates(subset=['client_id'], inplace=True)
+        
+        # Guardar los DataFrames como archivos CSV
+        client_df.to_csv(os.path.join(output_folder, 'client.csv'), index=False)
+        campaign_df.to_csv(os.path.join(output_folder, 'campaign.csv'), index=False)
+        economics_df.to_csv(os.path.join(output_folder, 'economics.csv'), index=False)
 
-    # Eliminar duplicados por client_id
-    client_df = client_df.drop_duplicates(subset=['client_id'])
-    campaign_df = campaign_df.drop_duplicates(subset=['client_id'])
-    economics_df = economics_df.drop_duplicates(subset=['client_id'])
-
-    # Guardar los DataFrames
-    client_df.to_csv(os.path.join(output_dir, 'client.csv'), index=False)
-    campaign_df.to_csv(os.path.join(output_dir, 'campaign.csv'), index=False)
-    economics_df.to_csv(os.path.join(output_dir, 'economics.csv'), index=False)
-
-    #print(f"- client.csv: {len(client_df)} registros")
-    #print(f"- campaign.csv: {len(campaign_df)} registros")
-    #print(f"- economics.csv: {len(economics_df)} registros")
+    # Uso de la función
+    input_folder = "files/input"
+    output_folder = "files/output"
+    transform_data(input_folder, output_folder)
 
 if __name__ == "__main__":
     clean_campaign_data()

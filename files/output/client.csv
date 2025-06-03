@@ -1,4 +1,4 @@
-client_id,age,job,marital,education,credit_default,mortage
+client_id,age,job,marital,education,credit_default,mortgage
 0,56,housemaid,married,basic_4y,0,0
 1,57,services,married,high_school,0,0
 2,37,services,married,high_school,0,1
