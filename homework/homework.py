@@ -97,7 +97,7 @@ def clean_campaign_data():
                         lambda x: 1 if x == 'success' else 0)
                     campaign_data['campaign_outcome'] = campaign_data['campaign_outcome'].apply(
                         lambda x: 1 if x == 'yes' else 0)
-                    campaign_data['last_contact_day'] = pd.to_datetime(
+                    campaign_data['last_contact_date'] = pd.to_datetime(
                         '2022-' + campaign_data['month'].astype(str) + '-' + campaign_data['day'].astype(str),
                         format='%Y-%b-%d'
                     ).dt.strftime('%Y-%m-%d')
